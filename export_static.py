@@ -65,7 +65,7 @@ def export(root=ROOT, pin=None):
     files['index.html'] = with_pin_gate(f'''<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Дневники питания</title>
 <script src="snapshot-encrypted.js"></script><link rel="icon" href="favicon.svg"><style>body{{font:18px system-ui;max-width:600px;margin:60px auto;padding:20px}}a{{display:block;padding:20px;border:1px solid #ccc;border-radius:14px;color:inherit}}</style>
-</head><body><h1>Дневники питания</h1>{links}<p>Только просмотр. Снимок обновлён: {snapshot['updatedAt']}.</p></body></html>''')
+</head><body><h1>Дневники питания</h1>{links}<p>Только просмотр. Снимок обновлён: {datetime.fromisoformat(snapshot['updatedAt']).strftime('%d-%m-%y')}.</p></body></html>''')
     files['.nojekyll'] = ''
     output = root / 'docs'
     output.mkdir(exist_ok=True)

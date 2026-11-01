@@ -24,6 +24,7 @@
   };
   window.diaryUnlocked.then(snapshot => {
     const status = document.getElementById('storageStatus');
-    status.textContent = `Только просмотр. Снимок обновлён: ${snapshot.updatedAt}.`;
+    const [year, month, day] = snapshot.updatedAt.slice(0, 10).split('-');
+    status.textContent = `Только просмотр. Снимок обновлён: ${day}-${month}-${year.slice(-2)}.`;
   });
 })();
