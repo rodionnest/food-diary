@@ -685,9 +685,9 @@ function renderAll() {
          <div class="meter"><div class="mrow"><span>Белок</span><b>${fmt(d.p)} г</b></div>
            <div class="bar"><span class="band" style="left:${PLAN.protMin / pMax * 100}%;width:${(PLAN.protMax - PLAN.protMin) / pMax * 100}%"></span><i style="width:${pPct}%;background:${pCol}"></i></div>
            <div class="mrow"><span>цель ${PLAN.protMin}–${PLAN.protMax} г</span><span>${d.p >= PLAN.protMin ? "в цели" : "не хватает " + (PLAN.protMin - d.p)}</span></div></div>
-         <div class="meter"><div class="mrow"><span>Б / Ж / У</span><b>${d.p} / ${d.f} / ${d.c}</b></div>
+          <div class="meter"><div class="mrow"><span>Б / Ж / У, г</span><b>${d.p} / ${d.f} / ${d.c}</b></div>
            <div class="stack"><i style="width:${kP / kT * 100}%;background:var(--prot)"></i><i style="width:${kF / kT * 100}%;background:var(--fat)"></i><i style="width:${kC / kT * 100}%;background:var(--carb)"></i></div>
-           <div class="legend"><span style="--c:var(--prot)">${sh(kP)}%</span><span style="--c:var(--fat)">${sh(kF)}%</span><span style="--c:var(--carb)">${sh(kC)}%</span></div></div>`));
+            <div class="legend"><span style="--c:var(--prot)" title="${sh(kP)}% энергии">Белки ${fmt(d.p)} г</span><span style="--c:var(--fat)" title="${sh(kF)}% энергии">Жиры ${fmt(d.f)} г</span><span style="--c:var(--carb)" title="${sh(kC)}% энергии">Углеводы ${fmt(d.c)} г</span></div></div>`));
     }
     const fl = flagsOf(d);
     let extra = fl.length ? `<div class="flags">${fl.map(f => `<span class="flag">${f.t}</span>`).join("")}</div>` : "";
