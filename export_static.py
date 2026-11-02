@@ -49,7 +49,7 @@ def export(root=ROOT, pin=None):
     encrypted = subprocess.run(
         ['node', str(ROOT / 'encrypt-snapshot.cjs')],
         input=json.dumps({'pin': pin, 'snapshot': snapshot}, ensure_ascii=False),
-        text=True, capture_output=True, check=True,
+        text=True, encoding="utf-8", capture_output=True, check=True,
     ).stdout
     files = {}
     for diary, (filename, _) in DIARIES.items():
