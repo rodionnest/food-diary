@@ -247,7 +247,7 @@ footer{font-size:12px;color:var(--muted)}
     <div>
       <div class="eyebrow">Сушка · старт 28.09.2026</div>
       <h1>Дневник веса</h1>
-      <p class="goal">Убрать жир на животе, сохранив мышцы. Ориентир — 1 800 ккал, белок 110–140 г, жиры около 60 г.</p>
+      <p class="goal">Убрать жир на животе, сохранив мышцы. Ориентир — 1 550 ккал, белок 110–140 г, жиры около 60 г.</p>
     </div>
     <div class="hright">
       <button id="themeBtn" class="theme-btn" type="button" aria-label="Переключить тему"><span id="themeIcon">☾</span><span id="themeLabel">Тёмная</span></button>
@@ -320,15 +320,15 @@ footer{font-size:12px;color:var(--muted)}
 
     <section class="panel prose">
       <h2>Калории и БЖУ</h2>
-      <p>Основной обмен по Миффлину — Сан Жеору ≈ <b class="num">1 780</b> ккал, с активностью ≈ <b class="num">2 500</b> ккал. Цель <b class="num">~1 800</b> ккал даёт дефицит около 700 ккал и темп 0,6–0,9 кг в неделю.</p>
+      <p>Основной обмен по Миффлину — Сан Жеору ≈ <b class="num">1 780</b> ккал, с активностью ≈ <b class="num">2 500</b> ккал. Текущая цель — <b class="num">1 550</b> ккал; фактический темп изменения веса оценивается по дневнику.</p>
       <div class="tscroll"><table>
         <thead><tr><th>Нутриент</th><th class="n">г/день</th><th class="n">ккал</th><th>Ориентир</th></tr></thead>
         <tbody>
           <tr><td><span class="dot" style="--c:var(--prot)"></span>Белок</td><td class="n">110–140</td><td class="n">440–560</td><td>пол 110 г (~1,3 г/кг), цель 140 г (~2,1 г/кг сухой массы)</td></tr>
           <tr><td><span class="dot" style="--c:var(--fat)"></span>Жиры</td><td class="n">60</td><td class="n">540</td><td>не ниже 50 г</td></tr>
-          <tr><td><span class="dot" style="--c:var(--carb)"></span>Углеводы</td><td class="n">175–205</td><td class="n">700–820</td><td>остаток бюджета, больше — вокруг тренировки</td></tr>
+          <tr><td><span class="dot" style="--c:var(--carb)"></span>Углеводы</td><td class="n">112,5–142,5</td><td class="n">450–570</td><td>остаток бюджета, больше — вокруг тренировки</td></tr>
         </tbody>
-        <tfoot><tr><td>Итого</td><td></td><td class="n">~1 800</td><td></td></tr></tfoot>
+        <tfoot><tr><td>Итого</td><td></td><td class="n">1 550</td><td></td></tr></tfoot>
       </table></div>
       <p class="muted">Белок: Morton 2018 (плато ~1,6 г/кг), Pasiakos 2013 (1,6 г/кг лучше 0,8 при дефиците, 2,4 без доп. выгоды), ISSN 2017.</p>
     </section>
@@ -385,7 +385,7 @@ footer{font-size:12px;color:var(--muted)}
   show(start);
 })();
 
-const PLAN = { kcal: 1800, protMin: 110, protMax: 140, fat: 60 };
+const PLAN = { kcal: 1550, protMin: 110, protMax: 140, fat: 60 };
 const WHENS = ["Утро", "Обед", "День", "Ужин", "Вечер"];
 
 const SEED_PRODUCTS = [
