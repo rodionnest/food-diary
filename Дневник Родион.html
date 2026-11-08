@@ -871,7 +871,8 @@ const MKEYS = MICRO.map(x => x.k);
 const SUPP = [
   { k: "fol", v: 800, n: "Метилфолат (добавка)" },
   { k: "o3", v: 510, n: "Омега-3 из водорослей (добавка)", from: "2026-10-28" },  // 350 DHA + 160 EPA, 1 капсула
-  { k: "d", v: 83, n: "Вигантол 5 капель (добавка)", from: "2026-10-28" }       // ~3 300 МЕ
+  { k: "d", v: 83, n: "Вигантол 5 капель (добавка)", from: "2026-10-28" },       // ~3 300 МЕ
+  { k: "i", v: 100, n: "Йод (добавка)", from: "2026-11-08" }
 ];
 const suppOf = k => SUPP.find(s => s.k === k);
 const MICRO_WIN = 30;     // средние — всегда за последний месяц
@@ -916,7 +917,7 @@ function microRows(sum, src, opts = {}) {
 function microDayHTML(d) {
   const { sum, src, known, total } = dayMicro(d);
   if (!known) return `<p class="mnote">Для этого дня нет данных по микроэлементам.</p>`;
-  return `<div class="mgrid">${microRows(sum, src)}</div><p class="mnote">Оценка по типовому составу продуктов, без соли при готовке. 💊 — с учётом добавок: метилфолат 800 мкг, омега-3 510 мг и витамин D 83 мкг (с 28.10).${known < total ? ` Не учтено строк: ${total - known}.` : ""} Метка на полосе — норма.</p>`;
+  return `<div class="mgrid">${microRows(sum, src)}</div><p class="mnote">Оценка по типовому составу продуктов, без соли при готовке. 💊 — с учётом добавок: метилфолат 800 мкг, омега-3 510 мг и витамин D 83 мкг (с 28.10), йод 100 мкг (с 08.11.2026).${known < total ? ` Не учтено строк: ${total - known}.` : ""} Метка на полосе — норма.</p>`;
 }
 function renderMicroAvg(fed) {
   const box = document.getElementById("microAvg"); if (!box) return;
@@ -929,7 +930,7 @@ function renderMicroAvg(fed) {
   box.hidden = false;
   box.innerHTML = `<h2>Микроэлементы · в среднем за месяц (${win.length} дн.)</h2><div class="mgrid">${microRows(sum, src)}</div>
     ${gaps.length ? `<div class="mgap">${gaps.map(x => `<div><span class="pill ${x.max ? "bad" : "bad"}">${x.max ? "много" : Math.round((sum[x.k] || 0) / x.norm * 100) + "%"}</span><b>${esc(x.n)}</b> — ${esc(x.tip)}</div>`).join("")}</div>` : ""}
-    <p class="mnote">💊 — с добавками: метилфолат 800 мкг в день, с 28.10 омега-3 510 мг и Вигантол 5 капель (~3 300 МЕ). Кальций не учтён. Натрий без соли при готовке, йод без йодированной соли — реальные цифры выше. Это оценка по типовому составу, не анализ крови.</p>`;
+    <p class="mnote">💊 — с добавками: метилфолат 800 мкг в день, с 28.10 омега-3 510 мг и Вигантол 5 капель (~3 300 МЕ). С 08.11.2026 йод 100 мкг в день. Кальций не учтён. Натрий без соли при готовке, йод без йодированной соли — реальные цифры выше. Это оценка по типовому составу, не анализ крови.</p>`;
 }
 // полный анализ за весь период: средние, понедельная карта и доля дней в норме
 function renderMicroAll(fed) {
@@ -966,7 +967,7 @@ function renderMicroAll(fed) {
       ${good.length ? `<div><span class="pill good">в норме</span>${list(good)}.</div>` : ""}
       <div><span class="pill ${naHigh > ds.length / 3 ? "warn" : "good"}">натрий</span>выше 2 300 мг было ${naHigh} дн. из ${ds.length}, и это ещё без соли при готовке.</div>
     </div>
-    <p class="mnote">Еда плюс 💊 добавки (метилфолат 800 мкг; с 28.10 омега-3 510 мг и витамин D ~3 300 МЕ), без соли при готовке. Оценка по типовому составу продуктов.</p>`;
+    <p class="mnote">Еда плюс 💊 добавки (метилфолат 800 мкг; с 28.10 омега-3 510 мг и витамин D ~3 300 МЕ; с 08.11.2026 йод 100 мкг), без соли при готовке. Оценка по типовому составу продуктов.</p>`;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-mview]"); if (!b) return;
