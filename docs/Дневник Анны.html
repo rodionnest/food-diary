@@ -314,8 +314,8 @@ footer{font-size:12px;color:var(--muted)}
         <thead><tr><th>Нутриент</th><th class="n">г/день</th><th class="n">ккал</th><th>Ориентир</th></tr></thead>
         <tbody>
           <tr><td><span class="dot" style="--c:var(--prot)"></span>Белок</td><td class="n">95–110</td><td class="n">380–440</td><td>2,0–2,2 г/кг: при быстром темпе белок важнее</td></tr>
-          <tr><td><span class="dot" style="--c:var(--fat)"></span>Жиры</td><td class="n">45–50</td><td class="n">405–450</td><td>не ниже 45 г (~0,9 г/кг) — ниже страдает цикл</td></tr>
-          <tr><td><span class="dot" style="--c:var(--carb)"></span>Углеводы</td><td class="n">90–110</td><td class="n">360–440</td><td>остаток бюджета; больше — в дни силовых</td></tr>
+          <tr><td><span class="dot" style="--c:var(--fat)"></span>Жиры</td><td class="n">45</td><td class="n">405</td><td>рабочая цель; небольшие отклонения допустимы</td></tr>
+          <tr><td><span class="dot" style="--c:var(--carb)"></span>Углеводы</td><td class="n">≈100</td><td class="n">≈400</td><td>при 1 200 ккал и белке 100 г; +25 г на каждые дополнительные 100 ккал плана</td></tr>
         </tbody>
         <tfoot><tr><td>Итого</td><td></td><td class="n">~1 200</td><td></td></tr></tfoot>
       </table></div>
@@ -398,7 +398,7 @@ footer{font-size:12px;color:var(--muted)}
 
 // ---------- профиль и план ----------
 const P = { sex: "f", born: "1990-11-04", height: 156, startW: 49.2, startDate: "2026-10-24", goalW: 46, goalDate: "2026-11-25" };
-const PLAN = { kcal: 1200, protMin: 95, protMax: 110, fatMin: 45, carbMin: 90, floor: 1200 };
+const PLAN = { kcal: 1200, protMin: 95, protMax: 110, fatMin: 45, fatGoal: 45, carbMin: 90, protGoal: 100, floor: 1200 };
 const DEFICIT = 770, ACTIVE_K = 0.75, KCAL_PER_KG = 7700, ALPHA = 0.2, RATE_DAYS = 10, TDEE_DAYS = 14;
 const CORR = { lo: -0.8, hi: -0.6 };
 const WHENS = ["Утро", "Обед", "День", "Ужин", "Вечер"];
@@ -449,6 +449,7 @@ function dayBurn(d) {
   return b * 1.375 + ACTIVE_K * d.trainKcal;
 }
 const dayTarget = d => Math.max(PLAN.floor, r50(dayBurn(d) - DEFICIT));
+const carbGoal = d => Math.max(0, Math.round((dayTarget(d) - PLAN.protGoal * 4 - PLAN.fatGoal * 9) / 4 / 5) * 5);
 function cycleDay(iso, days) { const s = days.filter(x => x.date <= iso && isCycleStart(x)).at(-1); return s ? daysBetween(s.date, iso) + 1 : null; }
 
 function waterHint(d, days) {
@@ -607,7 +608,7 @@ function renderAll() {
       const protOk = all.filter(d => d.p >= PLAN.protMin).length;
       items.push({ tag: protOk === all.length ? "good" : "warn", title: "Белок", body: `${protOk} из ${all.length} дней не ниже ${PLAN.protMin} г. В среднем ${fmt(avg(all.slice(-7), "p"))} г.` });
       const lowF = all.filter(d => d.f < PLAN.fatMin);
-      if (lowF.length) items.push({ tag: "warn", title: "Мало жиров", body: `${lowF.length} из ${all.length} дней меньше ${PLAN.fatMin} г (${lowF.map(d => dLabel(d.date)).join(", ")}). Для цикла важен минимум — яйца, рыба, орехи, сливочное масло.` });
+      if (lowF.length) items.push({ tag: "warn", title: "Мало жиров", body: `${lowF.length} из ${all.length} дней меньше ${PLAN.fatMin} г (${lowF.map(d => dLabel(d.date)).join(", ")}). Ориентир по жирам — ${PLAN.fatGoal} г в день; отдельный день ниже цели сам по себе не означает проблему со здоровьем.` });
       const under = all.filter(d => d.kcal < PLAN.floor);
       if (under.length) items.push({ tag: under.length >= 3 ? "bad" : "warn", title: "Ниже пола", body: `${under.length} дн. меньше ${fmt(PLAN.floor)} ккал (${under.map(d => dLabel(d.date)).join(", ")}). Такие дни ускоряют потерю мышц, а не жира.` });
       const lowC = all.filter(d => d.c < PLAN.carbMin);
@@ -687,7 +688,9 @@ function renderAll() {
            <div class="mrow"><span>цель ${PLAN.protMin}–${PLAN.protMax} г</span><span>${d.p >= PLAN.protMin ? "в цели" : "не хватает " + (PLAN.protMin - d.p)}</span></div></div>
           <div class="meter"><div class="mrow"><span>Б / Ж / У, г</span><b>${d.p} / ${d.f} / ${d.c}</b></div>
            <div class="stack"><i style="width:${kP / kT * 100}%;background:var(--prot)"></i><i style="width:${kF / kT * 100}%;background:var(--fat)"></i><i style="width:${kC / kT * 100}%;background:var(--carb)"></i></div>
-            <div class="legend"><span style="--c:var(--prot)" title="${sh(kP)}% энергии">Белки ${fmt(d.p)} г</span><span style="--c:var(--fat)" title="${sh(kF)}% энергии">Жиры ${fmt(d.f)} г</span><span style="--c:var(--carb)" title="${sh(kC)}% энергии">Углеводы ${fmt(d.c)} г</span></div></div>`));
+            <div class="legend"><span style="--c:var(--prot)" title="${sh(kP)}% энергии">Белки ${fmt(d.p)} г</span><span style="--c:var(--fat)" title="${sh(kF)}% энергии">Жиры ${fmt(d.f)} г</span><span style="--c:var(--carb)" title="${sh(kC)}% энергии">Углеводы ${fmt(d.c)} г</span></div>
+            <div class="mrow"><span>Цель Ж: ${PLAN.fatGoal} г</span><span>${d.f < PLAN.fatGoal ? "до цели " + fmt(PLAN.fatGoal - d.f, 1) + " г" : "цель достигнута"}</span></div>
+            <div class="mrow"><span>Цель У: ≈${carbGoal(d)} г</span><span>${d.c < carbGoal(d) ? "до цели " + fmt(carbGoal(d) - d.c, 1) + " г" : "цель достигнута"}</span></div></div>`));
     }
     const fl = flagsOf(d);
     let extra = fl.length ? `<div class="flags">${fl.map(f => `<span class="flag">${f.t}</span>`).join("")}</div>` : "";
