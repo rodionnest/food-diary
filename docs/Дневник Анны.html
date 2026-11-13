@@ -80,7 +80,8 @@ h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,6vw,44px);l
 .waterhint{font-size:13px;line-height:1.5;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--accent) 9%,transparent);border:1px solid color-mix(in srgb,var(--accent) 28%,transparent)}
 .waterhint ul{margin:6px 0 4px;padding-left:18px}
 .waterhint p{margin:4px 0 0;color:var(--muted)}
-.meters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.meters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.meter-summary{grid-column:1/-1}
 @media (max-width:720px){.meters{grid-template-columns:1fr}}
 .meter{display:grid;gap:6px;min-width:0}
 .mrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
@@ -262,6 +263,7 @@ footer{font-size:12px;color:var(--muted)}
 
   <div class="tabpane" id="p-move" hidden>
     <section class="tiles" id="mtiles"></section>
+    <section class="panel" id="activity-plan"></section>
     <section class="panel">
       <h2>Шаги и активные ккал за 14 дней</h2>
       <svg class="chart" id="mchart" viewBox="0 0 760 220" role="img" aria-label="Шаги и активные калории по дням"></svg>
@@ -399,6 +401,7 @@ footer{font-size:12px;color:var(--muted)}
 // ---------- профиль и план ----------
 const P = { sex: "f", born: "1990-11-04", height: 156, startW: 49.2, startDate: "2026-10-24", goalW: 46, goalDate: "2026-11-25" };
 const PLAN = { kcal: 1200, protMin: 95, protMax: 110, fatMin: 45, fatGoal: 45, carbMin: 90, protGoal: 100, floor: 1200 };
+const ACTIVITY_PLAN = { steps: 6000, trainingDays: [2, 4, 0], start: "2026-11-13" };
 const DEFICIT = 770, ACTIVE_K = 0.75, KCAL_PER_KG = 7700, ALPHA = 0.2, RATE_DAYS = 10, TDEE_DAYS = 14;
 const CORR = { lo: -0.8, hi: -0.6 };
 const WHENS = ["Утро", "Обед", "День", "Ужин", "Вечер"];
@@ -450,6 +453,14 @@ function dayBurn(d) {
 }
 const dayTarget = d => Math.max(PLAN.floor, r50(dayBurn(d) - DEFICIT));
 const carbGoal = d => Math.max(0, Math.round((dayTarget(d) - PLAN.protGoal * 4 - PLAN.fatGoal * 9) / 4 / 5) * 5);
+function macroMeter(label, value, goal, color, approximate = false) {
+  const scale = Math.max(goal * 1.5, value, 1);
+  const remaining = goal - value;
+  const progress = remaining > 0 ? `до цели ${fmt(remaining)} г` : "цель достигнута";
+  return `<div class="meter"><div class="mrow"><span>${label}</span><b>${fmt(value)} г</b></div>
+    <div class="bar"><i style="width:${value / scale * 100}%;background:${color}"></i>${goal > 0 ? `<span class="tick" style="left:${goal / scale * 100}%"></span>` : ""}</div>
+    <div class="mrow"><span>цель ${approximate ? "≈" : ""}${fmt(goal)} г</span><span>${progress}</span></div></div>`;
+}
 function cycleDay(iso, days) { const s = days.filter(x => x.date <= iso && isCycleStart(x)).at(-1); return s ? daysBetween(s.date, iso) + 1 : null; }
 
 function waterHint(d, days) {
@@ -674,6 +685,13 @@ function renderAll() {
     if (d.steps != null || d.active != null || d.trains.length) {
       card.append(el("div", "moverow", `<span class="lbl">Движение</span>${d.steps != null ? `<span class="chip move">${fmt(d.steps)} шагов</span>` : ""}${d.active != null ? `<span class="chip move">${fmt(d.active)} акт. ккал</span>` : ""}${d.trains.map(t => `<span class="chip move">${esc(t.name)}${num(t.min) ? " · " + fmt(num(t.min)) + " мин" : ""}${num(t.kcal) ? " · " + fmt(num(t.kcal)) + " ккал" : ""}</span>`).join("")}`));
     }
+    if (d.steps != null || hasTraining(d) || trainingPlanned(d.date) || d.date >= ACTIVITY_PLAN.start) {
+      const status = activityStatus(d, today0);
+      const training = hasTraining(d) || d.date >= ACTIVITY_PLAN.start
+        ? `<span class="chip">Тренировка · ${status.training}</span>` : "";
+      card.append(el("div", "moverow", `<span class="lbl">Цели</span>
+        <span class="chip">Шаги ${fmt(ACTIVITY_PLAN.steps)} · ${status.steps}</span>${training}`));
+    }
     if (d.meals.length) {
       const tgt = dayTarget(d), kMax = tgt * 1.35, kPct = Math.min(d.kcal / kMax, 1) * 100, kTick = tgt / kMax * 100;
       const kCol = d.kcal > tgt * 1.05 ? "var(--bad)" : d.kcal < PLAN.floor ? "var(--warn)" : "var(--good)";
@@ -686,11 +704,11 @@ function renderAll() {
          <div class="meter"><div class="mrow"><span>Белок</span><b>${fmt(d.p)} г</b></div>
            <div class="bar"><span class="band" style="left:${PLAN.protMin / pMax * 100}%;width:${(PLAN.protMax - PLAN.protMin) / pMax * 100}%"></span><i style="width:${pPct}%;background:${pCol}"></i></div>
            <div class="mrow"><span>цель ${PLAN.protMin}–${PLAN.protMax} г</span><span>${d.p >= PLAN.protMin ? "в цели" : "не хватает " + (PLAN.protMin - d.p)}</span></div></div>
-          <div class="meter"><div class="mrow"><span>Б / Ж / У, г</span><b>${d.p} / ${d.f} / ${d.c}</b></div>
+         ${macroMeter("Жиры", d.f, PLAN.fatGoal, "var(--fat)")}
+         ${macroMeter("Углеводы", d.c, carbGoal(d), "var(--carb)", true)}
+          <div class="meter meter-summary"><div class="mrow"><span>Б / Ж / У, г</span><b>${d.p} / ${d.f} / ${d.c}</b></div>
            <div class="stack"><i style="width:${kP / kT * 100}%;background:var(--prot)"></i><i style="width:${kF / kT * 100}%;background:var(--fat)"></i><i style="width:${kC / kT * 100}%;background:var(--carb)"></i></div>
-            <div class="legend"><span style="--c:var(--prot)" title="${sh(kP)}% энергии">Белки ${fmt(d.p)} г</span><span style="--c:var(--fat)" title="${sh(kF)}% энергии">Жиры ${fmt(d.f)} г</span><span style="--c:var(--carb)" title="${sh(kC)}% энергии">Углеводы ${fmt(d.c)} г</span></div>
-            <div class="mrow"><span>Цель Ж: ${PLAN.fatGoal} г</span><span>${d.f < PLAN.fatGoal ? "до цели " + fmt(PLAN.fatGoal - d.f, 1) + " г" : "цель достигнута"}</span></div>
-            <div class="mrow"><span>Цель У: ≈${carbGoal(d)} г</span><span>${d.c < carbGoal(d) ? "до цели " + fmt(carbGoal(d) - d.c, 1) + " г" : "цель достигнута"}</span></div></div>`));
+            <div class="legend"><span style="--c:var(--prot)" title="${sh(kP)}% энергии">Белки ${fmt(d.p)} г</span><span style="--c:var(--fat)" title="${sh(kF)}% энергии">Жиры ${fmt(d.f)} г</span><span style="--c:var(--carb)" title="${sh(kC)}% энергии">Углеводы ${fmt(d.c)} г</span></div></div>`));
     }
     const fl = flagsOf(d);
     let extra = fl.length ? `<div class="flags">${fl.map(f => `<span class="flag">${f.t}</span>`).join("")}</div>` : "";
@@ -776,16 +794,41 @@ function renderComp(days) {
     <details><summary>Все замеры · ${pts.length}</summary><div class="meals"><table><thead><tr><th class="when">Дата</th><th class="n">Вес</th><th class="n">Жир</th><th class="n">Жир, кг</th><th class="n">Безжир., кг</th><th class="n">Мышцы, кг</th></tr></thead><tbody>${rows}</tbody></table></div></details>`;
 }
 
+const hasTraining = d => d.trains.length > 0 || d.train === true || Boolean(d.trainText?.trim());
+const trainingPlanned = date => date >= ACTIVITY_PLAN.start &&
+  ACTIVITY_PLAN.trainingDays.includes(new Date(date + "T12:00:00").getDay());
+function activityStatus(d, today) {
+  const steps = d.steps == null ? "нет данных" : d.steps >= ACTIVITY_PLAN.steps ? "выполнено" :
+    d.date >= today ? "в процессе" : "не выполнено";
+  const training = hasTraining(d) ? "выполнено" : !trainingPlanned(d.date) ? "по плану отдых" :
+    d.date >= today ? "запланировано" : "не выполнено";
+  return { steps, training };
+}
+
 function renderMove(days, today0) {
+  const weekday = new Date(today0 + "T12:00:00").getDay();
+  const monday = shiftISO(today0, -((weekday + 6) % 7));
+  const week = Array.from({ length: 7 }, (_, i) => shiftISO(monday, i));
+  const planRows = week.map(date => {
+    const day = days.find(d => d.date === date) || { date, steps: null, trains: [] };
+    const status = activityStatus(day, today0);
+    const training = date < ACTIVITY_PLAN.start && !hasTraining(day) ? "—" : status.training;
+    const steps = day.steps == null ? status.steps : `${fmt(day.steps)} · ${status.steps}`;
+    return `<tr><td>${dLabel(date)} ${wday(date)}</td><td>${steps}</td><td>${training}</td></tr>`;
+  }).join("");
+  document.getElementById("activity-plan").innerHTML = `<h2>Цели активности</h2>
+    <p>${fmt(ACTIVITY_PLAN.steps)} шагов в день · тренировки во вторник, четверг и воскресенье</p>
+    <div class="tscroll"><table><thead><tr><th>День</th><th>Шаги</th><th>Тренировка</th></tr></thead><tbody>${planRows}</tbody></table></div>`;
+
   const done = days.filter(d => d.date < today0);
   const st7 = done.filter(d => d.steps != null).slice(-7), ac7 = done.filter(d => d.active != null).slice(-7);
-  const tr7 = days.filter(d => d.date >= shiftISO(today0, -6)).flatMap(d => d.trains);
+  const tr7 = days.filter(d => d.date >= shiftISO(today0, -6) && d.date <= today0 && hasTraining(d));
   const lastFull = done.at(-1);
   const m = document.getElementById("mtiles"); m.innerHTML = "";
   [
     ["Шаги", st7.length ? fmt(Math.round(avg(st7, "steps") / 100) * 100) : "—", st7.length ? `в среднем за ${st7.length} дн.` : "нет данных с часов"],
     ["Активные ккал", ac7.length ? fmt(avg(ac7, "active")) : "—", ac7.length ? `в среднем, учитываем 75%` : "нет данных с часов"],
-    ["Тренировки", tr7.length ? String(tr7.length) : "0", tr7.length ? `за 7 дней · ${fmt(tr7.reduce((a, t) => a + num(t.min), 0))} мин` : "добавим позже"],
+    ["Тренировки", tr7.length ? String(tr7.length) : "0", tr7.length ? `за 7 дней · ${fmt(tr7.reduce((sum, day) => sum + day.trainMin, 0))} мин` : "добавим позже"],
     ["Расход вчера", lastFull ? fmt(r50(dayBurn(lastFull))) : "—", lastFull ? `${dLabel(lastFull.date)} · норма ${fmt(dayTarget(lastFull))}` : "оценка по формуле"]
   ].forEach(([k, v, s]) => m.append(el("div", "tile", `<span class="eyebrow">${k}</span><b>${v}</b><span class="sub">${s}</span>`)));
 
@@ -805,7 +848,7 @@ function renderMove(days, today0) {
     for (let k = 0; k <= 4; k++) { const v = sTop * k / 4; s += `<line x1="${L}" x2="${W - R}" y1="${ys(v)}" y2="${ys(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${ys(v) + 4}" text-anchor="end">${v >= 1000 ? fmt(v / 1000, v % 1000 ? 1 : 0) + "к" : "0"}</text><text x="${W - R + 6}" y="${ys(v) + 4}">${fmt(aTop * k / 4)}</text>`; }
     rows.forEach((r, i) => {
       if (r.steps != null) s += `<rect x="${x(i) + bw * 0.18}" y="${ys(num(r.steps))}" width="${bw * 0.64}" height="${ys(0) - ys(num(r.steps))}" rx="3" fill="var(--move)" opacity=".75"><title>${dLabel(r.date)}: ${fmt(num(r.steps))} шагов</title></rect>`;
-      if (r.trains && r.trains.length) s += `<circle cx="${x(i) + bw / 2}" cy="${H - B + 6}" r="3" fill="var(--accent)"><title>тренировка</title></circle>`;
+      if (hasTraining(r)) s += `<circle cx="${x(i) + bw / 2}" cy="${H - B + 6}" r="3" fill="var(--accent)"><title>тренировка</title></circle>`;
       if (i % (W < 520 ? 3 : 2) === 0 || i === 13) s += `<text x="${x(i) + bw / 2}" y="${H - 8}" text-anchor="middle">${dLabel(r.date)}</text>`;
     });
     const pts = rows.map((r, i) => r.active != null ? `${x(i) + bw / 2},${ya(num(r.active))}` : null).filter(Boolean);
@@ -815,9 +858,9 @@ function renderMove(days, today0) {
     svg.innerHTML = s;
   }
 
-  const all = days.filter(d => d.trains.length).reverse();
+  const all = days.filter(hasTraining).reverse();
   document.getElementById("trains").innerHTML = `<h2>Тренировки</h2>${all.length
-    ? `<div class="tscroll"><table><thead><tr><th>Дата</th><th>Тренировка</th><th class="n">Мин</th><th class="n">Ккал</th></tr></thead><tbody>${all.flatMap(d => d.trains.map(t => `<tr><td class="when">${dLabel(d.date)} ${wday(d.date)}</td><td>${esc(t.name)}</td><td class="n">${num(t.min) ? fmt(num(t.min)) : "—"}</td><td class="n">${num(t.kcal) ? fmt(num(t.kcal)) : "—"}</td></tr>`)).join("")}</tbody></table></div>`
+    ? `<div class="tscroll"><table><thead><tr><th>Дата</th><th>Тренировка</th><th class="n">Мин</th><th class="n">Ккал</th></tr></thead><tbody>${all.flatMap(d => (d.trains.length ? d.trains : [{ name: d.trainText || "Тренировка" }]).map(t => `<tr><td class="when">${dLabel(d.date)} ${wday(d.date)}</td><td>${esc(t.name)}</td><td class="n">${num(t.min) ? fmt(num(t.min)) : "—"}</td><td class="n">${num(t.kcal) ? fmt(num(t.kcal)) : "—"}</td></tr>`)).join("")}</tbody></table></div>`
     : `<p class="empty">Тренировок пока нет. Когда начнутся, пиши в дневнике: «силовая 40 минут, часы 180 ккал» — здесь появится список и отметки на графике.</p>`}`;
 }
 
