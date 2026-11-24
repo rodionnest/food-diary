@@ -21,13 +21,14 @@ def clean(v):
 
 
 def skin_reminder(day):
-    score = day.get("rashScore")
-    questions = []
-    if type(score) is not int or not 0 <= score <= 5:
-        questions.append("как оценишь сыпь от 0 до 5")
-    if not isinstance(day.get("itch"), bool):
-        questions.append("был ли зуд")
-    return (" и ".join(questions).capitalize() + "?") if questions else ""
+    rash = day.get("rashScore")
+    itch = day.get("itch")
+    missing = []
+    if type(rash) is not int or not 0 <= rash <= 5:
+        missing.append("сыпь от 0 до 5")
+    if itch is not False and (type(itch) is not int or not 0 <= itch <= 3):
+        missing.append("зуд от 0 до 3")
+    return "Как оценишь " + " и ".join(missing) + "?" if missing else ""
 
 
 def main():

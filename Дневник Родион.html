@@ -418,10 +418,16 @@ const avg = (arr, k) => arr.length ? arr.reduce((s, x) => s + x[k], 0) / arr.len
 const sgn = v => v > 0.005 ? "+" : v < -0.005 ? "−" : "±";
 const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
+function skinScore(value, max) {
+  return Number.isInteger(value) && value >= 0 && value <= max ? value : null;
+}
+
 function withTotals(d) {
   const meals = Array.isArray(d.meals) ? d.meals : [];
-  const rashScore = Number.isInteger(d.rashScore) && d.rashScore >= 0 && d.rashScore <= 5 ? d.rashScore : null;
-  const itch = typeof d.itch === "boolean" ? d.itch : null;
+  const rashScore = skinScore(d.rashScore, 5);
+  let itch = skinScore(d.itch, 3);
+  if (d.itch === false) itch = 0;
+  if (d.itch === true) itch = true;  // В старой отметке «да» сила зуда неизвестна.
   const s = k => meals.reduce((a, m) => a + num(m[k]), 0);
   return { ...d, meals, rashScore, itch, kcal: Math.round(s("kcal")), p: Math.round(s("p")), f: Math.round(s("f")), c: Math.round(s("c")) };
 }
@@ -758,7 +764,7 @@ function renderAll() {
         const prevWheat = d => [0, -1, -2].some(k => days.find(x => x.date === shiftISO(d.date, k))?.meals.some(isWheat));
         const linked = sk.filter(prevWheat);
         body += ` Записи о состоянии кожи есть за ${sk.length} дн. (${sk.map(d => dLabel(d.date)).join(", ")}). В ${linked.length} из них пшеница была в тот же день или за 1–2 дня до.`;
-      } else body += " Можно отметить в чате выраженность сыпи от 0 до 5 и был ли зуд.";
+      } else body += " В чате можно оценить сыпь от 0 до 5 и зуд от 0 до 3.";
       items.push({ tag: lastW && cleanSince.length < 3 ? "bad" : "good", title: "Пшеница и кожа", body });
     })();
     (function () {
@@ -801,9 +807,11 @@ function renderAll() {
        <span class="weight">${hasW ? fmt(d.weight, 1) + " кг" : "вес —"}<small class="${dcls}">${dtxt}</small></span></div>`));
     if (d.date === latest || d.rashScore !== null || d.itch !== null) {
       const rash = d.rashScore === null ? "нет оценки" : `${d.rashScore}/5`;
-      const itch = d.itch === null ? "нет отметки" : (d.itch ? "да" : "нет");
+      let itch = "нет оценки";
+      if (d.itch === true) itch = "есть, без оценки";
+      else if (d.itch !== null) itch = `${d.itch}/3`;
       card.append(el("div", "skin",
-        `<span title="0 — сыпи нет, 5 — максимально выражена">Сыпь <b>${rash}</b></span><span>Зуд <b>${itch}</b></span>`));
+        `<span title="0 — сыпи нет, 5 — максимально выражена">Сыпь <b>${rash}</b></span><span title="0 — зуда нет, 1 — слабый, 2 — умеренный, 3 — сильный">Зуд <b>${itch}</b></span>`));
     }
     const wh = waterHint(d, days, fed, tdee);
     if (wh) card.append(el("div", "", wh));
