@@ -874,7 +874,15 @@ const SUPP = [
   { k: "d", v: 83, n: "Вигантол 5 капель (добавка)", from: "2026-10-28" },       // ~3 300 МЕ
   { k: "i", v: 100, n: "Йод (добавка)", from: "2026-11-08" }
 ];
-const suppOf = k => SUPP.find(s => s.k === k);
+// В supplementDoses дня хранятся новые суточные дозы с этой даты. Ноль означает паузу.
+let supplementChanges = [];
+function supplementsOn(date) {
+  return SUPP.filter(s => !s.from || s.from <= date).map(s => {
+    const change = supplementChanges.find(d => d.date <= date && Number.isFinite(d.supplementDoses[s.k]));
+    return change ? { ...s, v: change.supplementDoses[s.k] } : s;
+  }).filter(s => s.v > 0);
+}
+const hasSupplement = (src, key) => SUPP.some(s => s.k === key && src?.[key]?.[s.n] > 0);
 const MICRO_WIN = 30;     // средние — всегда за последний месяц
 let MEAL_VIEW = "kbju";   // переключатель в «Рационе»: КБЖУ или микроэлементы
 // нутриенты строки: сохранённые при записи, иначе — по справочнику (масштаб по калориям или граммам)
@@ -895,7 +903,7 @@ function dayMicro(d) {
     const mi = microOf(m); if (!mi) continue; known++;
     for (const k of MKEYS) { const v = num(mi[k]); if (!v) continue; sum[k] = (sum[k] || 0) + v; (src[k] = src[k] || {})[m.name] = (src[k][m.name] || 0) + v; }
   }
-  if (known) for (const s of SUPP.filter(s => !s.from || d.date >= s.from)) { sum[s.k] = (sum[s.k] || 0) + s.v; (src[s.k] = src[s.k] || {})[s.n] = s.v; }
+  if (known) for (const s of supplementsOn(d.date)) { sum[s.k] = (sum[s.k] || 0) + s.v; (src[s.k] = src[s.k] || {})[s.n] = s.v; }
   return { sum, src, known, total: d.meals.length };
 }
 function microState(x, v) {
@@ -903,13 +911,23 @@ function microState(x, v) {
   const r = v / x.norm; return r >= 0.9 ? "good" : r >= 0.6 ? "warn" : "bad";
 }
 const mfmt = (v, u) => u === "г" || v < 10 ? fmt(v, v < 10 && v % 1 ? 1 : 0) : fmt(Math.round(v));
+function supplementSummary(src, days = 1) {
+  const items = SUPP.filter(s => src[s.k]?.[s.n] > 0).map(s => {
+    const unit = MICRO.find(x => x.k === s.k).u;
+    const name = esc(s.n.replace(" (добавка)", ""));
+    return `${name} ${mfmt(src[s.k][s.n] / days, unit)} ${unit}`;
+  });
+  if (!items.length) return "";
+  const label = days === 1 ? "Добавки за день" : "Средний вклад добавок за день";
+  return `💊 ${label} — ${items.join(", ")}. `;
+}
 function microRows(sum, src, opts = {}) {
   return MICRO.map(x => {
     const v = sum[x.k] || 0, st = microState(x, v), lim = x.max || x.norm;
     const scale = Math.max(lim * 1.25, v), pct = Math.min(100, v / scale * 100), tick = x.norm / scale * 100;
     const top = src ? Object.entries(src[x.k] || {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([n]) => n) : [];
     const sub = opts.sub ? opts.sub(x, v) : top.length ? top.join(", ") : "нет источников";
-    return `<div class="mrowx" title="${esc(x.n)}: ${mfmt(v, x.u)} ${x.u} · норма ${x.max ? "до " + fmt(x.max) : fmt(x.norm, x.norm % 1 ? 1 : 0)} ${x.u} · ${Math.round(v / x.norm * 100)}%"><div class="mn"><b>${esc(x.n)}${suppOf(x.k) ? " 💊" : ""}</b><small>${esc(sub)}</small></div>
+    return `<div class="mrowx" title="${esc(x.n)}: ${mfmt(v, x.u)} ${x.u} · норма ${x.max ? "до " + fmt(x.max) : fmt(x.norm, x.norm % 1 ? 1 : 0)} ${x.u} · ${Math.round(v / x.norm * 100)}%"><div class="mn"><b>${esc(x.n)}${hasSupplement(src, x.k) ? " 💊" : ""}</b><small>${esc(sub)}</small></div>
       <div class="mtrack" style="--c:var(--${st})"><i style="width:${pct}%"></i><span class="tick" style="left:${tick}%"></span></div>
       <div class="mv">${mfmt(v, x.u)} <span>/ ${x.max ? "≤" + fmt(x.max) : fmt(x.norm, x.norm % 1 ? 1 : 0)} ${x.u}</span></div></div>`;
   }).join("");
@@ -917,7 +935,7 @@ function microRows(sum, src, opts = {}) {
 function microDayHTML(d) {
   const { sum, src, known, total } = dayMicro(d);
   if (!known) return `<p class="mnote">Для этого дня нет данных по микроэлементам.</p>`;
-  return `<div class="mgrid">${microRows(sum, src)}</div><p class="mnote">Оценка по типовому составу продуктов, без соли при готовке. 💊 — с учётом добавок: метилфолат 800 мкг, омега-3 510 мг и витамин D 83 мкг (с 28.10), йод 100 мкг (с 08.11.2026).${known < total ? ` Не учтено строк: ${total - known}.` : ""} Метка на полосе — норма.</p>`;
+  return `<div class="mgrid">${microRows(sum, src)}</div><p class="mnote">${supplementSummary(src)}Оценка по типовому составу продуктов, без соли при готовке.${known < total ? ` Не учтено строк: ${total - known}.` : ""} Метка на полосе — норма.</p>`;
 }
 function renderMicroAvg(fed) {
   const box = document.getElementById("microAvg"); if (!box) return;
@@ -930,7 +948,7 @@ function renderMicroAvg(fed) {
   box.hidden = false;
   box.innerHTML = `<h2>Микроэлементы · в среднем за месяц (${win.length} дн.)</h2><div class="mgrid">${microRows(sum, src)}</div>
     ${gaps.length ? `<div class="mgap">${gaps.map(x => `<div><span class="pill ${x.max ? "bad" : "bad"}">${x.max ? "много" : Math.round((sum[x.k] || 0) / x.norm * 100) + "%"}</span><b>${esc(x.n)}</b> — ${esc(x.tip)}</div>`).join("")}</div>` : ""}
-    <p class="mnote">💊 — с добавками: метилфолат 800 мкг в день, с 28.10 омега-3 510 мг и Вигантол 5 капель (~3 300 МЕ). С 08.11.2026 йод 100 мкг в день. Кальций не учтён. Натрий без соли при готовке, йод без йодированной соли — реальные цифры выше. Это оценка по типовому составу, не анализ крови.</p>`;
+    <p class="mnote">${supplementSummary(src, win.length)}Кальций не учтён. Натрий без соли при готовке, йод без йодированной соли — реальные цифры выше. Это оценка по типовому составу, не анализ крови.</p>`;
 }
 // полный анализ за весь период: средние, понедельная карта и доля дней в норме
 function renderMicroAll(fed) {
@@ -950,7 +968,7 @@ function renderMicroAll(fed) {
     const top = Object.entries(src[x.k] || {}).sort((a, b) => b[1] - a[1]).slice(0, 3);
     const all = top.reduce((a, [, v]) => a, 0), sumAll = Object.values(src[x.k] || {}).reduce((a, v) => a + v, 0) || 1;
     const sub = top.map(([n, v]) => `${n} ${Math.round(v / sumAll * 100)}%`).join(", ");
-    return { x, tot, ok, html: `<tr><td class="nm"><b>${esc(x.n)}${suppOf(x.k) ? " 💊" : ""}</b><small title="${esc(sub)}">${esc(sub || "нет источников")}</small></td>${wk}<td class="c tot" style="--c:var(--${microState(x, tot)})" title="${mfmt(tot, x.u)} ${x.u} в день · норма ${x.max ? "до " + fmt(x.max) : fmt(x.norm, x.norm % 1 ? 1 : 0)} ${x.u}">${pc(x, tot)}</td><td class="dn">${ok}/${ds.length}</td></tr>` };
+    return { x, tot, ok, html: `<tr><td class="nm"><b>${esc(x.n)}${hasSupplement(src, x.k) ? " 💊" : ""}</b><small title="${esc(sub)}">${esc(sub || "нет источников")}</small></td>${wk}<td class="c tot" style="--c:var(--${microState(x, tot)})" title="${mfmt(tot, x.u)} ${x.u} в день · норма ${x.max ? "до " + fmt(x.max) : fmt(x.norm, x.norm % 1 ? 1 : 0)} ${x.u}">${pc(x, tot)}</td><td class="dn">${ok}/${ds.length}</td></tr>` };
   });
   const chronic = rows.filter(r => !r.x.max && weeks.every(g => microState(r.x, avg(g.items, r.x.k)) === "bad"));
   const weak = rows.filter(r => !chronic.includes(r) && !r.x.max && microState(r.x, r.tot) !== "good");
@@ -967,7 +985,7 @@ function renderMicroAll(fed) {
       ${good.length ? `<div><span class="pill good">в норме</span>${list(good)}.</div>` : ""}
       <div><span class="pill ${naHigh > ds.length / 3 ? "warn" : "good"}">натрий</span>выше 2 300 мг было ${naHigh} дн. из ${ds.length}, и это ещё без соли при готовке.</div>
     </div>
-    <p class="mnote">Еда плюс 💊 добавки (метилфолат 800 мкг; с 28.10 омега-3 510 мг и витамин D ~3 300 МЕ; с 08.11.2026 йод 100 мкг), без соли при готовке. Оценка по типовому составу продуктов.</p>`;
+    <p class="mnote">${supplementSummary(src, ds.length)}Оценка по типовому составу продуктов, без соли при готовке.</p>`;
 }
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-mview]"); if (!b) return;
@@ -1091,6 +1109,7 @@ renderAll();
   if (!db) { setStatus("Хранилище недоступно."); return; }
   db.collection("days").onSnapshot(snap => {
     DAYS_STATE = snap.docs.map(d => d.data()).filter(d => d && d.date);
+    supplementChanges = DAYS_STATE.filter(d => d.supplementDoses).sort((a, b) => b.date.localeCompare(a.date));
     renderAll();
   }, () => setStatus("Связь с хранилищем прервалась — обнови страницу.", true));
   db.collection("suspects").onSnapshot(snap => {
