@@ -74,6 +74,8 @@ h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,6vw,44px);l
 .date em{font-style:normal;font-family:var(--f-body);font-size:13px;color:var(--muted);font-weight:600;margin-left:8px;text-transform:uppercase;letter-spacing:.08em}
 .weight{font-family:var(--f-mono);font-size:18px;font-weight:600}
 .weight small{font-size:12px;margin-left:6px}
+.skin{display:flex;flex-wrap:wrap;gap:4px 18px;color:var(--muted);font-size:13px}
+.skin b{color:var(--ink)}
 .up{color:var(--bad)} .down{color:var(--good)} .flat{color:var(--muted)}
 .chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--track);color:var(--ink)}
 .chip.train::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}
@@ -427,8 +429,10 @@ const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${Stri
 
 function withTotals(d) {
   const meals = Array.isArray(d.meals) ? d.meals : [];
+  const rashScore = Number.isInteger(d.rashScore) && d.rashScore >= 0 && d.rashScore <= 5 ? d.rashScore : null;
+  const itch = typeof d.itch === "boolean" ? d.itch : null;
   const s = k => meals.reduce((a, m) => a + num(m[k]), 0);
-  return { ...d, meals, kcal: Math.round(s("kcal")), p: Math.round(s("p")), f: Math.round(s("f")), c: Math.round(s("c")) };
+  return { ...d, meals, rashScore, itch, kcal: Math.round(s("kcal")), p: Math.round(s("p")), f: Math.round(s("f")), c: Math.round(s("c")) };
 }
 
 // ---------- расчёты ----------
@@ -758,12 +762,12 @@ function renderAll() {
       let body = lastW
         ? `Последний раз ${dLabel(lastW.date)}: ${[...new Set(lastW.meals.filter(isWheat).map(m => m.name.toLowerCase()))].slice(0, 4).join(", ")}. Без пшеницы ${cleanSince.length} дн. подряд; за 14 дней она была в ${recent.length} днях.`
         : `За весь дневник пшеницы не было.`;
-      const sk = days.filter(d => SKIN_RE.test(d.note || ""));
+      const sk = days.filter(d => d.rashScore !== null || d.itch !== null || SKIN_RE.test(d.note || ""));
       if (sk.length) {
         const prevWheat = d => [0, -1, -2].some(k => days.find(x => x.date === shiftISO(d.date, k))?.meals.some(isWheat));
         const linked = sk.filter(prevWheat);
-        body += ` Кожа отмечена ${sk.length} раз (${sk.map(d => dLabel(d.date)).join(", ")}); в ${linked.length} из них пшеница была в тот же день или за 1–2 дня до.`;
-      } else body += " Пиши состояние кожи в заметке дня («кожа чистая», «покраснение на груди») — тогда здесь появится сравнение с пшеницей.";
+        body += ` Записи о состоянии кожи есть за ${sk.length} дн. (${sk.map(d => dLabel(d.date)).join(", ")}). В ${linked.length} из них пшеница была в тот же день или за 1–2 дня до.`;
+      } else body += " Можно отметить в чате выраженность сыпи от 0 до 5 и был ли зуд.";
       items.push({ tag: lastW && cleanSince.length < 3 ? "bad" : "good", title: "Пшеница и кожа", body });
     })();
     (function () {
@@ -804,6 +808,12 @@ function renderAll() {
       `<div><span class="date">${dLabel(d.date)}<em>${wday(d.date)}</em></span></div>
        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${d.excluded ? `<span class="chip excl">не в анализе</span>` : ""}
        <span class="weight">${hasW ? fmt(d.weight, 1) + " кг" : "вес —"}<small class="${dcls}">${dtxt}</small></span></div>`));
+    if (d.date === latest || d.rashScore !== null || d.itch !== null) {
+      const rash = d.rashScore === null ? "нет оценки" : `${d.rashScore}/5`;
+      const itch = d.itch === null ? "нет отметки" : (d.itch ? "да" : "нет");
+      card.append(el("div", "skin",
+        `<span title="0 — сыпи нет, 5 — максимально выражена">Сыпь <b>${rash}</b></span><span>Зуд <b>${itch}</b></span>`));
+    }
     const wh = waterHint(d, days, fed, tdee);
     if (wh) card.append(el("div", "", wh));
 
