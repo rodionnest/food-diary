@@ -484,14 +484,17 @@ function earState(note) {
   return /сух|зуд|чеш|шелуш|корк|красн|трещ/i.test(t) ? 1 : 0;
 }
 
+function statsWeight(day) {
+  return typeof day?.weight === "number" && !day.weightExcluded ? day.weight : null;
+}
+
 // Почему вес подскочил: разбираем вчерашний день
-function waterHint(d, days, fed, tdee) {
-  if (typeof d.weight !== "number") return "";
-  const prevW = days.filter(x => x.date < d.date && typeof x.weight === "number").at(-1);
-  if (!prevW) return "";
+function waterHint(d, days, prevW, fed, tdee) {
+  if (statsWeight(d) === null || !prevW) return "";
   const jump = d.weight - prevW.weight;
   if (jump < 0.3) return "";
   const y = days.find(x => x.date === shiftISO(d.date, -1));
+  if (y?.weightExcluded) return "";
   const reasons = [];
   let fatMax = null;
   if (y && y.meals.length && !y.excluded) {
@@ -530,8 +533,9 @@ function flagsOf(d) {
 
 // ---------- отрисовка ----------
 function renderAll() {
-  const days = DAYS_STATE.map(withTotals).sort((a, b) => a.date.localeCompare(b.date));
-  const weighed = days.filter(d => typeof d.weight === "number");
+  const diaryDays = DAYS_STATE.map(withTotals).sort((a, b) => a.date.localeCompare(b.date));
+  const days = diaryDays.filter(d => !(d.excluded && d.weightExcluded));
+  const weighed = days.filter(d => statsWeight(d) !== null);
   const n = days.length, nw = weighed.length;
   const fed = days.filter(d => d.meals.length && !d.excluded && d.date < todayISO());  // только завершённые дни; excluded не входят в анализ калорий
   const last7 = fed.slice(-7);
@@ -718,8 +722,7 @@ function renderAll() {
       const kc = i => alcoOf(days[i]).reduce((s, m) => s + num(m.kcal), 0);
       const recent = ad.filter(i => days[i].date >= shiftISO(today0, -13));
       const rKcal = recent.reduce((s, i) => s + kc(i), 0);
-      const wOf2 = d => typeof d?.weight === "number" ? d.weight : null;
-      const nd = i => { const a = wOf2(days[i]), b = wOf2(dayAt(shiftISO(days[i].date, 1))); return a != null && b != null ? b - a : null; };
+      const nd = i => { const a = statsWeight(days[i]), b = statsWeight(dayAt(shiftISO(days[i].date, 1))); return a != null && b != null ? b - a : null; };
       const da = ad.map(nd).filter(v => v != null);
       const dno = all.filter(i => !alcoOf(days[i]).length).map(nd).filter(v => v != null);
       const av = a => a.reduce((s, v) => s + v, 0) / a.length;
@@ -728,7 +731,7 @@ function renderAll() {
       items.push({ tag: recent.length >= 3 ? "bad" : "warn", title: "Алкоголь", body });
     })();
 
-    const wOf = i => typeof days[i]?.weight === "number" ? days[i].weight : null;
+    const wOf = i => statsWeight(days[i]);
     const nextW = i => (i + 1 < n && days[i + 1].date === shiftISO(days[i].date, 1)) ? wOf(i + 1) : null;
     const sal = all.filter(i => has(i, "salty"));
     if (sal.length) {
@@ -791,19 +794,23 @@ function renderAll() {
 
   // карточки дней
   const daysEl = document.getElementById("days"); daysEl.innerHTML = "";
-  const latest = days.at(-1)?.date;
-  [...days].reverse().forEach(d => {
-    const idx = days.indexOf(d);
+  const latest = diaryDays.at(-1)?.date;
+  [...diaryDays].reverse().forEach(d => {
+    const flags = FL[days.indexOf(d)] || [];
     const prevW = weighed.filter(w => w.date < d.date).at(-1);
     const hasW = typeof d.weight === "number";
-    const diff = hasW && prevW ? d.weight - prevW.weight : 0;
+    const compareWeight = statsWeight(d) !== null;
+    const diff = compareWeight && prevW ? d.weight - prevW.weight : 0;
     const dcls = !hasW || !prevW || Math.abs(diff) < 0.05 ? "flat" : diff > 0 ? "up" : "down";
-    const dtxt = !hasW ? "" : prevW ? `${sgn(diff)}${fmt(Math.abs(diff), 1)}` : "старт";
+    const dtxt = !compareWeight ? "" : prevW ? `${sgn(diff)}${fmt(Math.abs(diff), 1)}` : "старт";
+    const excludedStats = [];
+    if (d.weightExcluded) excludedStats.push("вес");
+    if (d.excluded) excludedStats.push("питание");
 
     const card = el("article", "day"); card.dataset.date = d.date;
     card.append(el("div", "dhead",
       `<div><span class="date">${dLabel(d.date)}<em>${wday(d.date)}</em></span></div>
-       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${d.excluded ? `<span class="chip excl">не в анализе</span>` : ""}
+       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${excludedStats.length ? `<span class="chip excl">${excludedStats.join(" и ")} вне статистики</span>` : ""}
        <span class="weight">${hasW ? fmt(d.weight, 1) + " кг" : "вес —"}<small class="${dcls}">${dtxt}</small></span></div>`));
     if (d.date === latest || d.rashScore !== null || d.itch !== null) {
       const rash = d.rashScore === null ? "нет оценки" : `${d.rashScore}/5`;
@@ -813,7 +820,7 @@ function renderAll() {
       card.append(el("div", "skin",
         `<span title="0 — сыпи нет, 5 — максимально выражена">Сыпь <b>${rash}</b></span><span title="0 — зуда нет, 1 — слабый, 2 — умеренный, 3 — сильный">Зуд <b>${itch}</b></span>`));
     }
-    const wh = waterHint(d, days, fed, tdee);
+    const wh = waterHint(d, diaryDays, prevW, fed, tdee);
     if (wh) card.append(el("div", "", wh));
 
     if (d.meals.length) {
@@ -833,7 +840,7 @@ function renderAll() {
            <div class="legend"><span style="--c:var(--prot)">${sh(kP)}%</span><span style="--c:var(--fat)">${sh(kF)}%</span><span style="--c:var(--carb)">${sh(kC)}%</span></div></div>`));
     }
 
-    let extra = FL[idx].length ? `<div class="flags">${FL[idx].map(f => `<span class="flag${f.cls ? " " + f.cls : ""}">${f.t}</span>`).join("")}</div>` : "";
+    let extra = flags.length ? `<div class="flags">${flags.map(f => `<span class="flag${f.cls ? " " + f.cls : ""}">${f.t}</span>`).join("")}</div>` : "";
     if (d.note) extra += `<div class="note">${esc(d.note)}</div>`;
     if (extra) card.append(el("div", "", extra));
 
