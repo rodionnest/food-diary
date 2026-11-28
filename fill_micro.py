@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+SKIN_SCALES_FROM = "2026-11-28"
 
 
 def clean(v):
@@ -21,14 +22,18 @@ def clean(v):
 
 
 def skin_reminder(day):
-    rash = day.get("rashScore")
+    current_scales = (day.get("date") or SKIN_SCALES_FROM) >= SKIN_SCALES_FROM
     itch = day.get("itch")
-    missing = []
-    if type(rash) is not int or not 0 <= rash <= 5:
-        missing.append("сыпь от 0 до 5")
-    if itch is not False and (type(itch) is not int or not 0 <= itch <= 3):
-        missing.append("зуд от 0 до 3")
-    return "Как оценишь " + " и ".join(missing) + "?" if missing else ""
+    if itch is False:  # У старой отметки «нет» известна и сила зуда.
+        itch = 0
+    metrics = [("сыпь", day.get("rashScore"), 5), ("зуд", itch, 5 if current_scales else 3)]
+    if current_scales:
+        metrics.append(("уши", day.get("earScore"), 5))
+    missing = [f"{label} от 0 до {limit}" for label, value, limit in metrics
+               if type(value) is not int or not 0 <= value <= limit]
+    if len(missing) > 1:
+        missing[-2:] = [" и ".join(missing[-2:])]
+    return f"Как оценишь {', '.join(missing)}?" if missing else ""
 
 
 def main():
@@ -36,7 +41,7 @@ def main():
     parser.add_argument("diaries", nargs="*", metavar="дневник")
     parser.add_argument("--force", action="store_true", help="пересчитать заполненные микроэлементы")
     parser.add_argument("--meal-date", action="append", default=[], metavar="YYYY-MM-DD",
-                        help="после записи еды проверить отметки сыпи и зуда у Родиона за эту дату")
+                        help="после записи еды проверить оценки сыпи, зуда и состояния ушей у Родиона за эту дату")
     args = parser.parse_intermixed_args()
     ref = json.loads((ROOT / "nutrients.json").read_text(encoding="utf-8"))
     keys = ref["keys"]
